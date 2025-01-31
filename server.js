@@ -5,14 +5,8 @@ const fetch = require('node-fetch');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// CORS configuration
-const corsOptions = {
-    origin: process.env.NODE_ENV === 'production' 
-        ? ['https://your-frontend-domain.com'] // Update this with your actual domain
-        : ['http://localhost:3000', 'http://127.0.0.1:3000']
-};
-
-app.use(cors(corsOptions));
+// Simple CORS setup since frontend and backend are served from the same domain
+app.use(cors());
 app.use(express.static('public'));
 
 const API_BASE = 'https://api.whatsonchain.com/v1/bsv';
