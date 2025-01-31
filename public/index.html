@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitcoin UTXO & Merkle Proof Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            margin-bottom: 20px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            width: 400px;
+            padding: 8px;
+            font-size: 16px;
+        }
+        button {
+            padding: 8px 16px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .utxo-container {
+            margin-top: 20px;
+            border: 1px solid #ccc;
+            padding: 20px;
+        }
+        .utxo-item {
+            margin-bottom: 30px;
+            page-break-inside: avoid;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 20px;
+        }
+        .merkle-proof {
+            font-family: monospace;
+            white-space: pre-wrap;
+            background-color: #f5f5f5;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        @media print {
+            button, input {
+                display: none;
+            }
+            .utxo-container {
+                border: none;
+            }
+            .utxo-item {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Bitcoin UTXO & Merkle Proof Viewer</h1>
+        
+        <div class="input-group">
+            <input type="text" id="addressInput" placeholder="Enter Bitcoin address">
+            <button onclick="fetchData()">Fetch UTXOs & Proofs</button>
+        </div>
+
+        <div id="results" class="utxo-container"></div>
+    </div>
+
+    <script>
+        const NETWORK = 'main';
+        const API_BASE = 'http://localhost:3000/api';
+
+        async function fetchData() {
+            const address = document.getElementById('addressInput').value.trim();
+            if (!address) {
+                alert('Please enter a Bitcoin address');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = 'Loading...';
+
+            try {
+                // Fetch UTXOs
+                const utxosResponse = await fetch(`${API_BASE}/utxos/${NETWORK}/${address}`);
+                const utxosData = await utxosResponse.json();
+
+                if (!utxosData.result || utxosData.result.length === 0) {
+                    resultsDiv.innerHTML = 'No UTXOs found for this address.';
+                    return;
+                }
+
+                // For each UTXO, fetch its merkle proof
+                const utxosWithProofs = await Promise.all(utxosData.result.map(async (utxo) => {
+                    const proofResponse = await fetch(`${API_BASE}/merkleproof/${NETWORK}/${utxo.tx_hash}`);
+                    const proofData = await proofResponse.json();
+                    return { ...utxo, proof: proofData };
+                }));
+
+                // Display results
+                displayResults(utxosWithProofs, address);
+            } catch (error) {
+                resultsDiv.innerHTML = `Error: ${error.message}`;
+            }
+        }
+
+        function displayResults(utxosWithProofs, address) {
+            const resultsDiv = document.getElementById('results');
+            
+            let html = `<h2>Results for address: ${address}</h2>`;
+            html += `<p>Total UTXOs found: ${utxosWithProofs.length}</p>`;
+
+            utxosWithProofs.forEach((item, index) => {
+                html += `
+                    <div class="utxo-item">
+                        <h3>UTXO #${index + 1}</h3>
+                        <p><strong>Transaction Hash:</strong> ${item.tx_hash}</p>
+                        <p><strong>Value:</strong> ${item.value} satoshis</p>
+                        <p><strong>Output Index:</strong> ${item.tx_pos}</p>
+                        <p><strong>Block Height:</strong> ${item.height}</p>
+                        <div class="merkle-proof">
+                            <strong>Merkle Proof:</strong>
+                            <pre>${JSON.stringify(item.proof, null, 2)}</pre>
+                        </div>
+                    </div>
+                `;
+            });
+
+            resultsDiv.innerHTML = html;
+        }
+    </script>
+</body>
+</html>
